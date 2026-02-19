@@ -42,6 +42,7 @@ android {
 dependencies {
     implementation(platform(libs.firebase.bom)) // Latest Firebase BOM
     implementation(libs.google.firebase.auth.ktx) // Firebase Authentication
+
     implementation(libs.firebase.database.ktx)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -49,6 +50,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
