@@ -35,19 +35,22 @@
             android:gravity="center"
             android:paddingBottom="24dp"/>
 
+        <!-- CALL POLICE -->
         <LinearLayout
+            android:id="@+id/rowCall"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
 
-            <ImageButton
-                android:id="@+id/imageButton7"
+            <ImageView
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:background="@null"
-                app:srcCompat="@android:drawable/ic_menu_call"/>
+                android:src="@android:drawable/ic_menu_call"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -58,19 +61,22 @@
                 android:paddingStart="16dp"/>
         </LinearLayout>
 
+        <!-- SEND SOS -->
         <LinearLayout
+            android:id="@+id/rowSOS"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
 
-            <ImageButton
-                android:id="@+id/imageButton4"
+            <ImageView
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:background="@null"
-                app:srcCompat="@android:drawable/ic_menu_send"/>
+                android:src="@android:drawable/ic_menu_send"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -81,19 +87,22 @@
                 android:paddingStart="16dp"/>
         </LinearLayout>
 
+        <!-- SHARE LOCATION -->
         <LinearLayout
+            android:id="@+id/rowLocation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp">
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
 
-            <ImageButton
-                android:id="@+id/imageButton2"
+            <ImageView
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:background="@null"
-                app:srcCompat="@android:drawable/ic_menu_mylocation"/>
+                android:src="@android:drawable/ic_menu_mylocation"/>
 
             <TextView
                 android:layout_width="wrap_content"

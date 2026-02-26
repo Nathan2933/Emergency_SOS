@@ -1,3 +1,4 @@
+
 package com.example.myfirst
 
 import android.Manifest
@@ -19,8 +20,11 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
-import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -31,9 +35,13 @@ class MainActivity : AppCompatActivity() {
     private val LOCATION_PERMISSION_CODE = 101
     private val NOTIFICATION_PERMISSION_CODE = 102
 
+    private lateinit var database: AppDatabase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        database = AppDatabase.getDatabase(this)
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -44,21 +52,125 @@ class MainActivity : AppCompatActivity() {
         requestLocationPermission()
         requestNotificationPermission()
 
-        val btnSchedule = findViewById<ImageButton>(R.id.imageButton7)
-        val btnSync = findViewById<ImageButton>(R.id.imageButton4)
-        val btnSOS = findViewById<ImageButton>(R.id.imageButton2)
+        val rowCall = findViewById<LinearLayout>(R.id.rowCall)
+        val rowSOS = findViewById<LinearLayout>(R.id.rowSOS)
+        val rowLocation = findViewById<LinearLayout>(R.id.rowLocation)
 
-        registerForContextMenu(btnSchedule)
-        registerForContextMenu(btnSync)
-        registerForContextMenu(btnSOS)
+        rowCall.setOnClickListener {
+            showScheduleDatePicker()
+        }
 
-        btnSOS.setOnClickListener { showSOSConfirmDialog() }
-        btnSync.setOnClickListener { showGpsProgressDialog() }
-        btnSchedule.setOnClickListener { showScheduleDatePicker() }
+        rowCall.setOnLongClickListener {
+            showHistoryDialog()
+            true
+        }
 
-        btnSchedule.setOnLongClickListener { showPopup(it); true }
-        btnSync.setOnLongClickListener { showPopup(it); true }
-        btnSOS.setOnLongClickListener { showPopup(it); true }
+        rowSOS.setOnClickListener {
+            showGpsProgressDialog()
+        }
+
+        rowLocation.setOnClickListener {
+            showSOSConfirmDialog()
+        }
+    }
+
+    // ================= DATABASE (CRUD) =================
+
+    private fun insertCheckIn(time: String) {
+        val newCheck = SafetyCheck(dateTime = time, status = "Pending")
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            database.safetyDao().insert(newCheck)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Saved to Database", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showHistoryDialog() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val list = database.safetyDao().getAllChecks()
+
+            withContext(Dispatchers.Main) {
+                if (list.isEmpty()) {
+                    Toast.makeText(this@MainActivity, "No history found", Toast.LENGTH_SHORT).show()
+                    return@withContext
+                }
+
+                val displayList = list.map { "${it.dateTime} - ${it.status}" }.toTypedArray()
+
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Safety History")
+                    .setItems(displayList) { _, which ->
+                        showUpdateDeleteOptions(list[which])
+                    }
+                    .setPositiveButton("Close", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun showUpdateDeleteOptions(check: SafetyCheck) {
+        val options = arrayOf("Mark as Safe (Update)", "Delete Record")
+
+        AlertDialog.Builder(this)
+            .setTitle("Manage Record")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> updateStatus(check)
+                    1 -> deleteRecord(check)
+                }
+            }
+            .show()
+    }
+
+    private fun updateStatus(check: SafetyCheck) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            database.safetyDao().update(check.copy(status = "Safe"))
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Status Updated!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun deleteRecord(check: SafetyCheck) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            database.safetyDao().delete(check)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Deleted", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ================= SCHEDULE =================
+
+    private fun showScheduleDatePicker() {
+        val c = Calendar.getInstance()
+        DatePickerDialog(this, { _, year, month, day ->
+            showScheduleTimePicker(year, month, day)
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH))
+            .apply { setTitle("Select Safety Check Date") }
+            .show()
+    }
+
+    private fun showScheduleTimePicker(year: Int, month: Int, day: Int) {
+        val c = Calendar.getInstance()
+
+        TimePickerDialog(this, { _, hour, minute ->
+            val scheduledTime = "$day/${month + 1}/$year at $hour:$minute"
+
+            insertCheckIn(scheduledTime)
+
+            showStatusNotification(
+                "Safety Check Scheduled",
+                "Check-in set for $scheduledTime"
+            )
+
+            Toast.makeText(this, "Scheduled for: $scheduledTime", Toast.LENGTH_LONG).show()
+
+        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
+            .apply { setTitle("Select Check-in Time") }
+            .show()
     }
 
     // ================= LOCATION =================
@@ -85,10 +197,8 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                if (location != null) {
-                    currentLocation = location
-                }
+            fusedLocationClient.lastLocation.addOnSuccessListener {
+                currentLocation = it
             }
         }
     }
@@ -114,64 +224,51 @@ class MainActivity : AppCompatActivity() {
     // ================= SOS =================
 
     private fun showSOSConfirmDialog() {
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Confirm SOS Alert")
-        builder.setMessage("Are you sure you want to notify all emergency contacts of your current location?")
-        builder.setIcon(android.R.drawable.ic_dialog_alert)
+        AlertDialog.Builder(this)
+            .setTitle("Confirm SOS Alert")
+            .setMessage("Notify emergency contacts of your location?")
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setPositiveButton("SEND SOS") { _, _ ->
 
-        builder.setPositiveButton("SEND SOS") { _, _ ->
+                getLastLocation()
 
-            getLastLocation()
+                currentLocation?.let {
+                    val message = """
+                        SOS ALERT!
+                        Latitude: ${it.latitude}
+                        Longitude: ${it.longitude}
+                        Address: ${getAddressFromLocation(it)}
+                    """.trimIndent()
 
-            if (currentLocation != null) {
-
-                val lat = currentLocation!!.latitude
-                val lng = currentLocation!!.longitude
-                val address = getAddressFromLocation(currentLocation!!)
-
-                val message = """
-                    SOS ALERT!
-                    
-                    Latitude: $lat
-                    Longitude: $lng
-                    Address: $address
-                """.trimIndent()
-
-                showStatusNotification("SOS DISPATCHED", message)
-                Toast.makeText(this, "SOS Sent with Location!", Toast.LENGTH_LONG).show()
-
-            } else {
-                Toast.makeText(this, "Location not available", Toast.LENGTH_SHORT).show()
+                    showStatusNotification("SOS DISPATCHED", message)
+                    Toast.makeText(this, "SOS Sent!", Toast.LENGTH_LONG).show()
+                } ?: Toast.makeText(this, "Location not available", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        builder.setNegativeButton("CANCEL") { dialog, _ -> dialog.dismiss() }
-        builder.show()
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ================= GPS SYNC =================
 
     private fun showGpsProgressDialog() {
         val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
-        progressBar.setPadding(50, 30, 50, 30)
         progressBar.max = 100
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Syncing GPS Location")
-            .setMessage("Connecting to satellites...")
+            .setTitle("Syncing GPS")
             .setView(progressBar)
             .setCancelable(false)
             .create()
 
         dialog.show()
 
-        var progressStatus = 0
+        var progress = 0
         val handler = Handler(Looper.getMainLooper())
 
         Thread {
-            while (progressStatus < 100) {
-                progressStatus += 10
-                handler.post { progressBar.progress = progressStatus }
+            while (progress < 100) {
+                progress += 10
+                handler.post { progressBar.progress = progress }
                 Thread.sleep(200)
             }
 
@@ -179,43 +276,16 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
                 getLastLocation()
 
-                if (currentLocation != null) {
-                    val lat = currentLocation!!.latitude
-                    val lng = currentLocation!!.longitude
-
+                currentLocation?.let {
                     showStatusNotification(
                         "Location Synced",
-                        "Lat: $lat, Lng: $lng"
+                        "Lat: ${it.latitude}, Lng: ${it.longitude}"
                     )
                 }
 
                 Toast.makeText(this, "GPS Sync Complete", Toast.LENGTH_SHORT).show()
             }
         }.start()
-    }
-
-    // ================= SCHEDULE =================
-
-    private fun showScheduleDatePicker() {
-        val c = Calendar.getInstance()
-        val datePicker = DatePickerDialog(this, { _, year, month, day ->
-            showScheduleTimePicker(year, month, day)
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH))
-
-        datePicker.setTitle("Select Safety Check Date")
-        datePicker.show()
-    }
-
-    private fun showScheduleTimePicker(year: Int, month: Int, day: Int) {
-        val c = Calendar.getInstance()
-        val timePicker = TimePickerDialog(this, { _, hour, minute ->
-            val scheduledTime = "$day/${month + 1}/$year at $hour:$minute"
-            showStatusNotification("Safety Check Scheduled", "Check-in set for $scheduledTime")
-            Toast.makeText(this, "Scheduled for: $scheduledTime", Toast.LENGTH_LONG).show()
-        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
-
-        timePicker.setTitle("Select Check-in Time")
-        timePicker.show()
     }
 
     // ================= NOTIFICATIONS =================
@@ -230,9 +300,8 @@ class MainActivity : AppCompatActivity() {
             .setAutoCancel(true)
 
         try {
-            with(NotificationManagerCompat.from(this)) {
-                notify(System.currentTimeMillis().toInt(), builder.build())
-            }
+            NotificationManagerCompat.from(this)
+                .notify(System.currentTimeMillis().toInt(), builder.build())
         } catch (e: SecurityException) {
             Toast.makeText(this, "Notification Permission Denied", Toast.LENGTH_SHORT).show()
         }
@@ -263,20 +332,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ================= POPUPS & MENUS =================
+    // ================= POPUP =================
 
     private fun showPopup(view: View) {
         val popup = PopupMenu(this, view)
         popup.menuInflater.inflate(R.menu.popup_menu, popup.menu)
-        popup.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.popup_view -> {
-                    showStatusNotification("Viewing Contact", "Opening safety profile...")
-                    true
-                }
-                else -> false
-            }
-        }
         popup.show()
     }
 }
