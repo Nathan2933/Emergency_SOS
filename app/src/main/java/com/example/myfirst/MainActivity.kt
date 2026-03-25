@@ -4,14 +4,18 @@ package com.example.myfirst
 import android.Manifest
 import android.app.*
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.telephony.SmsManager
 import android.view.*
+import android.view.animation.AnimationUtils
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +38,9 @@ class MainActivity : AppCompatActivity() {
     private var currentLocation: Location? = null
     private val LOCATION_PERMISSION_CODE = 101
     private val NOTIFICATION_PERMISSION_CODE = 102
+    
+    private var mediaPlayer: MediaPlayer? = null
+    private var isSirenPlaying = false
 
     private lateinit var database: AppDatabase
 
@@ -54,7 +61,15 @@ class MainActivity : AppCompatActivity() {
 
         val rowCall = findViewById<LinearLayout>(R.id.rowCall)
         val rowSOS = findViewById<LinearLayout>(R.id.rowSOS)
+        
+        // Start Pulse Animation on SOS Row
+        val pulse = AnimationUtils.loadAnimation(this, R.anim.pulse)
+        rowSOS.startAnimation(pulse)
         val rowLocation = findViewById<LinearLayout>(R.id.rowLocation)
+        val rowSMS = findViewById<LinearLayout>(R.id.rowSMS)
+        val rowWhatsApp = findViewById<LinearLayout>(R.id.rowWhatsApp)
+        val rowSetContact = findViewById<LinearLayout>(R.id.rowSetContact)
+        val rowVideo = findViewById<LinearLayout>(R.id.rowVideo)
 
         rowCall.setOnClickListener {
             showScheduleDatePicker()
@@ -71,6 +86,109 @@ class MainActivity : AppCompatActivity() {
 
         rowLocation.setOnClickListener {
             showSOSConfirmDialog()
+        }
+
+        rowSMS.setOnClickListener {
+            val sharedPrefs = getSharedPreferences("EmergencySOS", MODE_PRIVATE)
+            val savedContact = sharedPrefs.getString("emergency_contact", "")
+            if (!savedContact.isNullOrEmpty()) {
+                val message = "EMERGENCY! I need help. My location: ${currentLocation?.let { "${it.latitude}, ${it.longitude}" } ?: "Not available"}"
+                sendSMS(savedContact, message)
+            } else {
+                promptForContactAndSend("SMS")
+            }
+        }
+
+        rowWhatsApp.setOnClickListener {
+            val sharedPrefs = getSharedPreferences("EmergencySOS", MODE_PRIVATE)
+            val savedContact = sharedPrefs.getString("emergency_contact", "")
+            if (!savedContact.isNullOrEmpty()) {
+                val message = "EMERGENCY! I need help. My location: ${currentLocation?.let { "${it.latitude}, ${it.longitude}" } ?: "Not available"}"
+                sendWhatsAppMessage(savedContact, message)
+            } else {
+                promptForContactAndSend("WhatsApp")
+            }
+        }
+
+        rowSetContact.setOnClickListener {
+            showSetContactDialog()
+        }
+
+        rowVideo.setOnClickListener {
+            startActivity(Intent(this, VideoActivity::class.java))
+        }
+    }
+
+    private fun showSetContactDialog() {
+        val input = EditText(this)
+        val sharedPrefs = getSharedPreferences("EmergencySOS", MODE_PRIVATE)
+        input.setText(sharedPrefs.getString("emergency_contact", ""))
+        input.hint = "Enter Phone Number"
+
+        AlertDialog.Builder(this)
+            .setTitle("Set Emergency Contact")
+            .setMessage("This number will be used for automatic alerts.")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val phoneNumber = input.text.toString()
+                sharedPrefs.edit().putString("emergency_contact", phoneNumber).apply()
+                Toast.makeText(this, "Emergency contact saved!", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun promptForContactAndSend(type: String) {
+        val input = EditText(this)
+        input.hint = "Enter Phone Number"
+        
+        AlertDialog.Builder(this)
+            .setTitle("Send $type Alert")
+            .setMessage("Enter the phone number of your friend:")
+            .setView(input)
+            .setPositiveButton("Send") { _, _ ->
+                val phoneNumber = input.text.toString()
+                if (phoneNumber.isNotEmpty()) {
+                    val message = "EMERGENCY! I need help. My location: ${currentLocation?.let { "${it.latitude}, ${it.longitude}" } ?: "Not available"}"
+                    if (type == "SMS") {
+                        sendSMS(phoneNumber, message)
+                    } else {
+                        sendWhatsAppMessage(phoneNumber, message)
+                    }
+                } else {
+                    Toast.makeText(this, "Phone number cannot be empty", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendSMS(phoneNumber: String, message: String) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    this.getSystemService(SmsManager::class.java)
+                } else {
+                    SmsManager.getDefault()
+                }
+                smsManager.sendTextMessage(phoneNumber, null, message, null, null)
+                Toast.makeText(this, "SMS Sent to $phoneNumber", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Failed to send SMS: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.SEND_SMS), 103)
+        }
+    }
+
+    private fun sendWhatsAppMessage(phoneNumber: String, message: String) {
+        val url = "https://api.whatsapp.com/send?phone=$phoneNumber&text=${java.net.URLEncoder.encode(message, "UTF-8")}"
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+        intent.data = android.net.Uri.parse(url)
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "WhatsApp not installed.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -241,11 +359,38 @@ class MainActivity : AppCompatActivity() {
                     """.trimIndent()
 
                     showStatusNotification("SOS DISPATCHED", message)
-                    Toast.makeText(this, "SOS Sent!", Toast.LENGTH_LONG).show()
+                    toggleSiren()
+                    Toast.makeText(this, "SOS Sent & Siren Triggered!", Toast.LENGTH_LONG).show()
                 } ?: Toast.makeText(this, "Location not available", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun toggleSiren() {
+        if (isSirenPlaying) {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isSirenPlaying = false
+            Toast.makeText(this, "Siren Stopped", Toast.LENGTH_SHORT).show()
+        } else {
+            try {
+                // Using a system sound as a fallback siren or tell user to add R.raw.siren
+                mediaPlayer = MediaPlayer.create(this, android.provider.Settings.System.DEFAULT_RINGTONE_URI)
+                mediaPlayer?.isLooping = true
+                mediaPlayer?.start()
+                isSirenPlaying = true
+            } catch (e: Exception) {
+                Toast.makeText(this, "Error playing siren", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     // ================= GPS SYNC =================

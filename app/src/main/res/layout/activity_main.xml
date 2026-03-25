@@ -113,6 +113,110 @@
                 android:paddingStart="16dp"/>
         </LinearLayout>
 
+        <!-- SEND SMS -->
+        <LinearLayout
+            android:id="@+id/rowSMS"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@android:drawable/ic_menu_send"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Send SMS Alert"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingStart="16dp"/>
+        </LinearLayout>
+
+        <!-- SEND WHATSAPP -->
+        <LinearLayout
+            android:id="@+id/rowWhatsApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@android:drawable/ic_menu_camera"/> <!-- Camera icon as placeholder for WhatsApp -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Send WhatsApp Alert"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingStart="16dp"/>
+        </LinearLayout>
+
+        <!-- SET EMERGENCY CONTACT -->
+        <LinearLayout
+            android:id="@+id/rowSetContact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@android:drawable/ic_menu_add"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Emergency Contact"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingStart="16dp"/>
+        </LinearLayout>
+
+        <!-- TUTORIAL VIDEO -->
+        <LinearLayout
+            android:id="@+id/rowVideo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@android:drawable/ic_menu_slideshow"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="How to Use (Video)"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingStart="16dp"/>
+        </LinearLayout>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
