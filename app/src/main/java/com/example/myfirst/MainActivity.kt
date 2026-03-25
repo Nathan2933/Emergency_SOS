@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
+import android.content.IntentFilter
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,12 +37,14 @@ class MainActivity : AppCompatActivity() {
     private val NOTIFICATION_PERMISSION_CODE = 102
 
     private lateinit var database: AppDatabase
+    private lateinit var systemReceiver: SystemReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         database = AppDatabase.getDatabase(this)
+        systemReceiver = SystemReceiver()
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -338,5 +341,22 @@ class MainActivity : AppCompatActivity() {
         val popup = PopupMenu(this, view)
         popup.menuInflater.inflate(R.menu.popup_menu, popup.menu)
         popup.show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val filter = IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_AIRPLANE_MODE_CHANGED)
+            addAction(android.content.Intent.ACTION_BATTERY_LOW)
+            addAction(android.content.Intent.ACTION_BATTERY_OKAY)
+            addAction(android.content.Intent.ACTION_POWER_CONNECTED)
+            addAction(android.content.Intent.ACTION_POWER_DISCONNECTED)
+        }
+        registerReceiver(systemReceiver, filter)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(systemReceiver)
     }
 }
